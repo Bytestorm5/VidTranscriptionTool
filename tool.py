@@ -1,7 +1,7 @@
 from transcribe import transcribe
 from download import download_audio_ytdlp
 
-link = "https://www.youtube.com/watch?v=5RpiOeyYkMo"
+link = input("Paste your Youtube Video Link here:")
 
 download_audio_ytdlp(link)
 transcribe()
