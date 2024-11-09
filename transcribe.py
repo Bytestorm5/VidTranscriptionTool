@@ -1,12 +1,18 @@
 import whisper
+from whisper.decoding import DecodingOptions
+from whisper.tokenizer import LANGUAGES
 from pydub import AudioSegment
 import math
 import os
 import shutil
 from tqdm import tqdm
 import torch
+import sys
+import argparse
+from urllib.request import urlopen
+import json
 
-def transcribe():
+def transcribe(languages: list[str]):
     # Check if CUDA is available and set device
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
@@ -20,7 +26,7 @@ def transcribe():
     os.makedirs(chunks_dir)
 
     # Load the audio from the video file
-    audio = AudioSegment.from_file('audio.mp3')
+    audio = AudioSegment.from_file('video.mp4')
     audio_length = len(audio)  # Length in milliseconds
 
     # Define chunk length (10 minutes in milliseconds)
@@ -46,7 +52,9 @@ def transcribe():
         chunk.export(chunk_filename, format="mp3")
         
         # Transcribe the audio chunk
-        result = model.transcribe(chunk_filename)
+        languages = [LANGUAGES[l] if l in LANGUAGES else l for l in languages]
+        prompt = f"This transcript is primarily written in " + " & ".join(languages) + "."
+        result = model.transcribe(chunk_filename, initial_prompt=prompt)  # Use the first language
         full_text += result["text"] + " "
         
         # Optionally, remove the chunk file after processing
@@ -56,3 +64,25 @@ def transcribe():
     print(full_text)
     with open("OUTPUT.txt", 'w+', encoding='utf-8') as writer:
         writer.write(full_text)
+
+if __name__ == "__main__":
+    # Set up argument parser
+    parser = argparse.ArgumentParser(description="Transcribe audio with Whisper.")
+    parser.add_argument(
+        "-l", "--languages", nargs="+", required=True,
+        help="List of languages to transcribe audio into."
+    )
+    args = parser.parse_args()
+
+    # Fetch valid Whisper languages
+    valid_languages = LANGUAGES
+
+    # Validate provided languages
+    for lang in args.languages:
+        if lang not in valid_languages:
+            print(f"Error: '{lang}' is not a valid language. Valid options are:")
+            print(", ".join(valid_languages.keys()))
+            sys.exit(1)
+
+    # Run transcription
+    transcribe(args.languages)
