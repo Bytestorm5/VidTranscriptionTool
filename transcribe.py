@@ -1,3 +1,4 @@
+import torch.amp
 import whisper
 from whisper.decoding import DecodingOptions
 from whisper.tokenizer import LANGUAGES
@@ -54,7 +55,8 @@ def transcribe(languages: list[str]):
         # Transcribe the audio chunk
         languages = [LANGUAGES[l] if l in LANGUAGES else l for l in languages]
         prompt = f"This transcript is primarily written in " + " & ".join(languages) + "."
-        result = model.transcribe(chunk_filename, initial_prompt=prompt)  # Use the first language
+        with torch.amp.autocast_mode.autocast(device):
+            result = model.transcribe(chunk_filename, initial_prompt=prompt)  # Use the first language
         full_text += result["text"] + " "
         
         # Optionally, remove the chunk file after processing
