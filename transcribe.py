@@ -36,14 +36,9 @@ def transcribe(languages: list[str]):
     # Calculate the number of chunks
     number_of_chunks = math.ceil(audio_length / chunk_length)
 
-    # Load the Whisper model onto the device
-    model = whisper.load_model("large", device=device)
-
-    # Initialize a variable to hold the transcribed text
-    full_text = ""
-
-    # Process each chunk with a progress bar
-    for i in tqdm(range(number_of_chunks), desc="Processing Chunks"):
+    # First Loop: Split the audio into chunks
+    print("Splitting audio into chunks...")
+    for i in tqdm(range(number_of_chunks), desc="Splitting Chunks"):
         start = i * chunk_length
         end = min((i + 1) * chunk_length, audio_length)
         chunk = audio[start:end]
@@ -51,16 +46,30 @@ def transcribe(languages: list[str]):
         # Export the chunk to the chunks directory
         chunk_filename = os.path.join(chunks_dir, f"chunk_{i}.mp3")
         chunk.export(chunk_filename, format="mp3")
+
+    # Load the Whisper model onto the device
+    model = whisper.load_model("large", device=device)
+
+    # Initialize a variable to hold the transcribed text
+    full_text = ""
+
+    # Prepare the prompt based on languages
+    languages_formatted = [LANGUAGES[l] if l in LANGUAGES else l for l in languages]
+    prompt = f"This transcript is primarily written in " + " & ".join(languages_formatted) + "."
+
+    # Second Loop: Transcribe each chunk
+    print("Transcribing chunks...")
+    chunk_files = sorted(os.listdir(chunks_dir))  # Ensure consistent order
+    for chunk_file in tqdm(chunk_files, desc="Transcribing Chunks"):
+        chunk_path = os.path.join(chunks_dir, chunk_file)
         
         # Transcribe the audio chunk
-        languages = [LANGUAGES[l] if l in LANGUAGES else l for l in languages]
-        prompt = f"This transcript is primarily written in " + " & ".join(languages) + "."
         with torch.amp.autocast_mode.autocast(device):
-            result = model.transcribe(chunk_filename, initial_prompt=prompt)  # Use the first language
+            result = model.transcribe(chunk_path, initial_prompt=prompt)
         full_text += result["text"] + " "
         
         # Optionally, remove the chunk file after processing
-        # os.remove(chunk_filename)
+        # os.remove(chunk_path)
 
     # Print the combined transcribed text
     print(full_text)
